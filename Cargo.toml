@@ -1,0 +1,7 @@
+[package]
+name = "mono_display"
+version = "0.1.0"
+authors = ["Sergey Ulanov <sulanov@gmail.com>"]
+
+[dependencies]
+rppal = "0.7.1"
