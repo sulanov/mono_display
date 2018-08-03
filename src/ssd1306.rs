@@ -44,10 +44,10 @@ fn find_span_end(a: &[u8], b: &[u8]) -> usize {
             last_diff = i;
         }
         if i - last_diff > 4 {
-            return i;
+            return last_diff + 1;
         }
     }
-    a.len()
+    last_diff + 1
 }
 
 impl Ssd1306 {
@@ -193,8 +193,8 @@ impl Ssd1306 {
                 }
 
                 // Set high and low addresses.
-                self.send_command(&[0x00 | (pos as u8 & 0x07)])?;
-                self.send_command(&[0x10 | ((pos as u8 & 0x70) >> 4)])?;
+                self.send_command(&[0x00 | (pos as u8 & 0x0f)])?;
+                self.send_command(&[0x10 | ((pos as u8 & 0xf0) >> 4)])?;
 
                 self.send_data(&new[pos..end])?;
 

@@ -48,6 +48,12 @@ impl Frame {
     }
 }
 
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum Color {
+    Light,
+    Dark,
+}
+
 pub struct Canvas {
     frame: Frame,
 }
@@ -57,16 +63,47 @@ impl Canvas {
         Canvas { frame }
     }
 
-    pub fn set_pixel(&mut self, a: Point, color: bool) {
-        let pos = (a.y as usize / 8) * self.frame.size().width + a.x as usize;
-        let byte = &mut self.frame.mut_data()[pos];
-        if color {
-            *byte |= 1u8 << (a.y % 8);
-        } else {
-            *byte &= !(1u8 << (a.y % 8));
+    pub fn set_pixel(&mut self, point: Point, color: Color) {
+        self.draw_rect(
+            point,
+            Size {
+                width: 1,
+                height: 1,
+            },
+            color,
+        )
+    }
+
+    pub fn draw_rect(&mut self, top_left: Point, size: Size, color: Color) {
+        let top = top_left.y;
+        let bottom = top + size.height as i16 - 1;
+        for row in (top / 8)..(bottom / 8 + 1) {
+            let mut mask = 0xff;
+            if row == top / 8 {
+                let bits = top % 8;
+                mask >>= bits;
+                mask <<= bits;
+            }
+
+            if row == bottom / 8 {
+                let bits = 7 - bottom % 8;
+                mask <<= bits;
+                mask >>= bits;
+            }
+
+            for x in top_left.x..(top_left.x + size.width as i16) {
+                let pos = row as usize * self.frame.size().width + x as usize;
+                let byte = &mut self.frame.mut_data()[pos];
+                if color == Color::Light {
+                    *byte |= mask;
+                } else {
+                    *byte &= !mask;
+                }
+            }
         }
     }
-    // pub fn draw_line(&mut self, a: Point, b: Point, color: bool) {}
+
+    // pub fn draw_line(&mut self, a: Point, b: Point, color: Color) {}
 
     pub fn take_frame(self) -> Frame {
         self.frame
