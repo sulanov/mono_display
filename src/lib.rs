@@ -1,5 +1,5 @@
-pub mod gfx;
 mod driver;
+pub mod gfx;
 pub mod ssd1306;
 
 use std::result;
