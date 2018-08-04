@@ -3,7 +3,10 @@ name = "example"
 version = "0.1.0"
 authors = ["Sergey Ulanov <sulanov@gmail.com>"]
 
-[dependencies]
+[features]
+default = [ "sdl2" ]
 
-[dependencies.mono_display]
-path = "../"
+sdl2 = [ "mono_display/sdl2" ]
+
+[dependencies]
+mono_display = { path = "../" }

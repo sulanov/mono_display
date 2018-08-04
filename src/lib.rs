@@ -2,6 +2,9 @@ mod driver;
 pub mod gfx;
 pub mod ssd1306;
 
+#[cfg(feature = "sdl2")]
+pub mod sdl_driver;
+
 use std::result;
 
 #[derive(Debug)]
