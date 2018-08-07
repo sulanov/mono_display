@@ -1,3 +1,4 @@
+extern crate bdf;
 extern crate font_rs;
 
 use std;
@@ -18,7 +19,13 @@ impl From<std::io::Error> for Error {
 
 impl From<font_rs::font::FontError> for Error {
     fn from(e: font_rs::font::FontError) -> Error {
-        Error::from_string(format!("Fonts error: {:?}", e))
+        Error::from_string(format!("TTF Font error: {:?}", e))
+    }
+}
+
+impl From<bdf::Error> for Error {
+    fn from(e: bdf::Error) -> Error {
+        Error::from_string(format!("BDF Font error: {:?}", e))
     }
 }
 
@@ -165,11 +172,13 @@ impl Frame {
 
 struct Glyph {
     rect: Rect,
+    width: usize,
     data: Vec<u8>,
 }
 
 pub struct Font {
     glyphs: BTreeMap<u32, Glyph>,
+    size: usize,
 }
 
 fn render_glyph(font: &font_rs::font::Font, codepoint: u32, size: usize) -> Option<Glyph> {
@@ -193,16 +202,52 @@ fn render_glyph(font: &font_rs::font::Font, codepoint: u32, size: usize) -> Opti
     }
     Some(Glyph {
         rect: Rect::xywh(glyph.left as i16, glyph.top as i16, width, height),
+        width,
         data,
     })
 }
 
 impl Font {
-    pub fn load(filename: &str, size: usize) -> Result<Font> {
+    pub fn load_bdf(filename: &str, size: usize) -> Result<Font> {
         let mut file = fs::File::open(filename)?;
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
+        Font::from_data_bdf(&data[..], size)
+    }
 
+    pub fn from_data_bdf(data: &[u8], size: usize) -> Result<Font> {
+        let bdf_font = bdf::read(data)?;
+        let mut glyphs = BTreeMap::new();
+        for (codepoint, bdf_glyph) in bdf_font.glyphs() {
+            let (x, y) = bdf_glyph.vector().unwrap_or(&(0, 0));
+            let width = bdf_glyph.width() as usize;
+            let height = bdf_glyph.height() as usize;
+            let rect = Rect::xywh(*x as i16, -(*y as i16) - height as i16, width, height);
+            let mut data = vec![0u8; width * ((height + 7) / 8)];
+            for ((x, y), value) in bdf_glyph.pixels() {
+                let d = &mut data[(x as usize + (y as usize / 8) * width) as usize];
+                let mask = 1 << y % 8;
+                let bit = if value { 1 } else { 0 };
+                *d = (*d & (!mask)) | (bit << (y % 8));
+            }
+            let glyph = Glyph {
+                rect,
+                width: bdf_font.device_width().unwrap_or(&(width as u32, 0)).0 as usize,
+                data,
+            };
+            glyphs.insert(*codepoint as u32, glyph);
+        }
+        Ok(Font { glyphs, size })
+    }
+
+    pub fn load_ttf(filename: &str, size: usize) -> Result<Font> {
+        let mut file = fs::File::open(filename)?;
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)?;
+        Font::from_data_ttf(&data[..], size)
+    }
+
+    pub fn from_data_ttf(data: &[u8], size: usize) -> Result<Font> {
         let font = font_rs::font::parse(&data)?;
         let mut glyphs = BTreeMap::new();
         for i in 16..2000 {
@@ -211,7 +256,11 @@ impl Font {
             }
         }
 
-        Ok(Font { glyphs })
+        Ok(Font { glyphs, size })
+    }
+
+    fn size(&self) -> usize {
+        self.size
     }
 
     fn get_glyph(&self, codepoint: u32) -> Option<&Glyph> {
@@ -234,9 +283,14 @@ where
     F: FnMut(Vector, &Glyph),
 {
     for c in text.chars() {
-        if let Some(glyph) = font.get_glyph(c as u32) {
-            func(pos, glyph);
-            pos.x += glyph.rect.size.width as i16 + 1;
+        match font.get_glyph(c as u32) {
+            Some(glyph) => {
+                func(pos, glyph);
+                pos.x += glyph.width as i16 + 1;
+            }
+            None => {
+                pos.x += font.size() as i16 / 2 + 1;
+            }
         }
     }
 }
@@ -255,8 +309,11 @@ impl Canvas {
 
         let top = rect.top();
         let bottom = rect.bottom() - 1;
+        if bottom < top {
+            return;
+        }
         for row in (top / 8)..(bottom / 8 + 1) {
-            let mut mask = 0xff;
+            let mut mask = 0xffu8;
             if row == top / 8 {
                 let bits = top % 8;
                 mask >>= bits;
@@ -264,7 +321,7 @@ impl Canvas {
             }
 
             if row == bottom / 8 {
-                let bits = 7 - bottom % 8;
+                let bits = (7 - bottom % 8) as u32;
                 mask <<= bits;
                 mask >>= bits;
             }
