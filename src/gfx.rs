@@ -178,7 +178,6 @@ struct Glyph {
 
 pub struct Font {
     glyphs: BTreeMap<u32, Glyph>,
-    size: usize,
 }
 
 fn render_glyph(font: &font_rs::font::Font, codepoint: u32, size: usize) -> Option<Glyph> {
@@ -202,27 +201,27 @@ fn render_glyph(font: &font_rs::font::Font, codepoint: u32, size: usize) -> Opti
     }
     Some(Glyph {
         rect: Rect::xywh(glyph.left as i16, glyph.top as i16, width, height),
-        width,
+        width: width + 1,
         data,
     })
 }
 
 impl Font {
-    pub fn load_bdf(filename: &str, size: usize) -> Result<Font> {
+    pub fn load_bdf(filename: &str) -> Result<Font> {
         let mut file = fs::File::open(filename)?;
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
-        Font::from_data_bdf(&data[..], size)
+        Font::from_data_bdf(&data[..])
     }
 
-    pub fn from_data_bdf(data: &[u8], size: usize) -> Result<Font> {
+    pub fn from_data_bdf(data: &[u8]) -> Result<Font> {
         let bdf_font = bdf::read(data)?;
         let mut glyphs = BTreeMap::new();
         for (codepoint, bdf_glyph) in bdf_font.glyphs() {
-            let (x, y) = bdf_glyph.vector().unwrap_or(&(0, 0));
+            let (x, y) = (bdf_glyph.bounds().x, bdf_glyph.bounds().y);
             let width = bdf_glyph.width() as usize;
             let height = bdf_glyph.height() as usize;
-            let rect = Rect::xywh(*x as i16, -(*y as i16) - height as i16, width, height);
+            let rect = Rect::xywh(x as i16, -(y as i16) - height as i16, width, height);
             let mut data = vec![0u8; width * ((height + 7) / 8)];
             for ((x, y), value) in bdf_glyph.pixels() {
                 let d = &mut data[(x as usize + (y as usize / 8) * width) as usize];
@@ -232,12 +231,12 @@ impl Font {
             }
             let glyph = Glyph {
                 rect,
-                width: bdf_font.device_width().unwrap_or(&(width as u32, 0)).0 as usize,
+                width: bdf_glyph.device_width().unwrap_or(&(width as u32, 0)).0 as usize,
                 data,
             };
             glyphs.insert(*codepoint as u32, glyph);
         }
-        Ok(Font { glyphs, size })
+        Ok(Font { glyphs })
     }
 
     pub fn load_ttf(filename: &str, size: usize) -> Result<Font> {
@@ -256,11 +255,7 @@ impl Font {
             }
         }
 
-        Ok(Font { glyphs, size })
-    }
-
-    fn size(&self) -> usize {
-        self.size
+        Ok(Font { glyphs })
     }
 
     fn get_glyph(&self, codepoint: u32) -> Option<&Glyph> {
@@ -286,10 +281,10 @@ where
         match font.get_glyph(c as u32) {
             Some(glyph) => {
                 func(pos, glyph);
-                pos.x += glyph.width as i16 + 1;
+                pos.x += glyph.width as i16;
             }
             None => {
-                pos.x += font.size() as i16 / 2 + 1;
+                pos.x += 5;
             }
         }
     }

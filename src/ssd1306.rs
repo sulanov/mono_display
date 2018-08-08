@@ -115,7 +115,7 @@ impl Ssd1306 {
         self.send_command(&[0xA6])?;
 
         // Set contrast level.
-        self.send_command(&[0x81, 0x8F])?;
+        self.send_command(&[0x81, 0x1F])?;
 
         self.send_command(&[COMMAND_DISPLAY_ON])?;
 
