@@ -2,6 +2,9 @@
 name = "mono_display"
 version = "0.1.0"
 authors = ["Sergey Ulanov <sulanov@gmail.com>"]
+description = "Library for monochrome displays."
+license = "BSD-3-Clause"
+repository = "https://github.com/sulanov/mono_display"
 
 [features]
 default = []
