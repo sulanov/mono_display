@@ -1,4 +1,4 @@
-use gfx;
+use crate::gfx;
 
 pub trait DisplayDriver {
     fn size(&self) -> gfx::Size;

@@ -185,7 +185,7 @@ impl Ssd1306 {
                     continue;
                 }
 
-                let mut end = pos + find_span_end(&old[pos..], &new[pos..]);
+                let end = pos + find_span_end(&old[pos..], &new[pos..]);
 
                 if !page_set {
                     self.send_command(&[0xB0 | page])?;
